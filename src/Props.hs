@@ -1,4 +1,19 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeFamilies      #-}
+
 module Props where
 
-helloWorld :: String
-helloWorld = "Hello World!"
+import           Yesod
+
+data App = App
+
+mkYesod "App" [parseRoutes|
+/ HomeR GET
+|]
+
+instance Yesod App
+
+getHomeR :: Handler Html
+getHomeR = defaultLayout [whamlet|Hello World!|]
