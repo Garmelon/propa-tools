@@ -1,0 +1,44 @@
+cabal-version: 1.18
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 057a536ac3d0fd40b3122084eee53201158527bbcd0dbac7cec33d8fd06cf208
+
+name:           props
+version:        0.1.0.0
+author:         Garmelon <joscha@plugh.de>
+maintainer:     Garmelon <joscha@plugh.de>
+copyright:      2020 Garmelon
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    LICENSE
+extra-doc-files:
+    README.md
+
+library
+  exposed-modules:
+      Props
+  other-modules:
+      Paths_props
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
+
+executable props
+  main-is: Main.hs
+  other-modules:
+      Paths_props
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , props
+  default-language: Haskell2010

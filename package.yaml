@@ -1,0 +1,29 @@
+name: props
+version: 0.1.0.0
+license: MIT
+author: Garmelon <joscha@plugh.de>
+copyright: 2020 Garmelon
+
+extra-source-files:
+- README.md
+- LICENSE
+
+extra-doc-files:
+- README.md
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+
+executables:
+  props:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - props
