@@ -15,6 +15,7 @@ dependencies:
 - base >= 4.7 && < 5
 - containers
 - text
+- transformers
 
 library:
   source-dirs: src

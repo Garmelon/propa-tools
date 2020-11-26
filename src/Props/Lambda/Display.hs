@@ -5,12 +5,15 @@ module Props.Lambda.Display
   , makeVarNamesUnique
   , findVarNames
   , displayTerm
+  , displayTerm'
   ) where
 
 import           Data.Maybe
 import           Numeric.Natural
 
-import qualified Data.Text         as T
+import           Control.Monad.Trans.State
+import qualified Data.Set                  as Set
+import qualified Data.Text                 as T
 
 import           Props.Lambda.Term
 
@@ -26,17 +29,57 @@ constNames = chars ++ (mappend <$> constNames <*> chars)
   where
     chars = map T.singleton ['A'..'Z']
 
+chooseUnique :: (Ord a) => Set.Set a -> [a] -> a
+chooseUnique taken = head . dropWhile (`Set.member` taken)
+
+makeNameUnique :: Set.Set Name -> Name -> Name
+makeNameUnique taken name
+  = chooseUnique taken
+  $ zipWith (<>) (repeat name)
+  $ "" : map (T.pack . show) [(2::Integer) ..]
+
 findConstNames :: Term e (Maybe Name) v -> Term e Name v
-findConstNames = mapConsts (fromMaybe "[]") -- TODO implement
+findConstNames term = evalState (helper term) (Set.fromList $ catMaybes $ consts term)
+  where
+    helper (Var i) = pure $ Var i
+    helper (Const c) = do
+      taken <- get
+      let name = fromMaybe (chooseUnique taken constNames) c
+      put $ Set.insert name taken
+      pure $ Const name
+    helper (Lambda v t) = Lambda v <$> helper t
+    helper (App l r) = App <$> helper l <*> helper r
+    helper (Ext e) = pure $ Ext e
 
-makeVarNamesUnique :: Term e c (Maybe Name) -> Term e c (Maybe Name)
-makeVarNamesUnique = id -- TODO implement
+makeVarNamesUnique :: Term e Name (Maybe Name) -> Term e Name (Maybe Name)
+makeVarNamesUnique term = helper (Set.fromList $ consts term) term
+  where
+    helper _     (Var i) = Var i
+    helper _     (Const c) = Const c
+    helper taken (Lambda v t) = case v of
+      Nothing -> Lambda Nothing $ helper taken t
+      Just name ->
+        let newName = makeNameUnique taken name
+        in  Lambda (Just newName) $ helper (Set.insert name taken) t
+    helper taken (App l r) = App (helper taken l) (helper taken r)
+    helper _     (Ext e) = Ext e
 
-findVarNames :: Term e c (Maybe Name) -> Term e c Name
-findVarNames = mapVars (fromMaybe "[]") -- TODO implement
+findVarNames :: Term e Name (Maybe Name) -> Term e Name Name
+findVarNames term = helper (Set.fromList $ consts term) term
+  where
+    helper _     (Var i) = Var i
+    helper _     (Const c) = Const c
+    helper taken (Lambda v t) =
+      let name = fromMaybe (chooseUnique taken varNames) v
+      in  Lambda name $ helper (Set.insert name taken) t
+    helper taken (App l r) = App (helper taken l) (helper taken r)
+    helper _     (Ext e) = Ext e
 
 displayTerm :: (e -> T.Text) -> Term e Name Name -> T.Text
 displayTerm f = dTerm f []
+
+displayTerm' :: (e -> T.Text) -> Term e (Maybe Name) (Maybe Name) -> T.Text
+displayTerm' f = displayTerm f . findVarNames . makeVarNamesUnique . findConstNames
 
 nth :: [a] -> Natural -> Maybe a
 nth []     _ = Nothing
