@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | This module contains functions useful for displaying 'Term's.
+
 module Props.Lambda.Display
-  ( findConstNames
+  ( Name
+  , findConstNames
   , makeVarNamesUnique
   , findVarNames
   , displayTerm
@@ -17,6 +20,7 @@ import qualified Data.Text                 as T
 
 import           Props.Lambda.Term
 
+-- | The name of a variable or a constant.
 type Name = T.Text
 
 varNames :: [Name]
@@ -38,6 +42,11 @@ makeNameUnique taken name
   $ zipWith (<>) (repeat name)
   $ "" : map (T.pack . show) [(2::Integer) ..]
 
+-- | Find names for constants that don't overlap with existing constants. Every
+-- unnamed constant is assumed to be a different constant. This means that every
+-- unnamed constant will be assigned a unique name.
+--
+-- Names for constants follow the schema @A@, @B@, ... @AA@, @AB@, ...
 findConstNames :: Term e (Maybe Name) v -> Term e Name v
 findConstNames term = evalState (helper term) (Set.fromList $ catMaybes $ consts term)
   where
@@ -51,6 +60,9 @@ findConstNames term = evalState (helper term) (Set.fromList $ catMaybes $ consts
     helper (App l r) = App <$> helper l <*> helper r
     helper (Ext e) = pure $ Ext e
 
+-- | Make names of existing variables unique. If the name is not already unique
+-- in the current scope, tries to make it unique by appending a number from
+-- @[2..]@.
 makeVarNamesUnique :: Term e Name (Maybe Name) -> Term e Name (Maybe Name)
 makeVarNamesUnique term = helper (Set.fromList $ consts term) term
   where
@@ -64,6 +76,9 @@ makeVarNamesUnique term = helper (Set.fromList $ consts term) term
     helper taken (App l r) = App (helper taken l) (helper taken r)
     helper _     (Ext e) = Ext e
 
+-- | Find names for unnamed variables that are unique in the current scope.
+--
+-- Names for variables follow the schema @a@, @b@, ..., @aa@, @ab@, ...
 findVarNames :: Term e Name (Maybe Name) -> Term e Name Name
 findVarNames term = helper (Set.fromList $ consts term) term
   where
@@ -75,9 +90,13 @@ findVarNames term = helper (Set.fromList $ consts term) term
     helper taken (App l r) = App (helper taken l) (helper taken r)
     helper _     (Ext e) = Ext e
 
+-- | Display a term using the variable and constant names provided. Does not
+-- attempt to resolve name collisions.
 displayTerm :: (e -> T.Text) -> Term e Name Name -> T.Text
 displayTerm f = dTerm f []
 
+-- | Display a term. Tries to use the provided variable names where possible.
+-- Resolves name collisions.
 displayTerm' :: (e -> T.Text) -> Term e (Maybe Name) (Maybe Name) -> T.Text
 displayTerm' f = displayTerm f . findVarNames . makeVarNamesUnique . findConstNames
 
