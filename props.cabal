@@ -4,7 +4,7 @@ cabal-version: 1.18
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5e16e68a3016455a93f44cbee36b19144a1a414a8cb0bf4a062a1566b7119a38
+-- hash: 5a5ea1f94c0aefd4530bcfe91d7e5265b092b9e1b361d21bef695382fe4422a5
 
 name:           props
 version:        0.1.0.0
@@ -22,8 +22,8 @@ extra-doc-files:
 
 library
   exposed-modules:
-      Props
-      Props.Lambda
+      Props.Lambda.Display
+      Props.Lambda.Term
   other-modules:
       Paths_props
   hs-source-dirs:
