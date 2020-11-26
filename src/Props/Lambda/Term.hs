@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings#-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Props.Lambda.Term
   ( Term(..)
@@ -12,7 +12,7 @@ module Props.Lambda.Term
 
 import           Numeric.Natural
 
-import qualified Data.Text as T
+import qualified Data.Text       as T
 
 -- | Lambda calculus term using De Bruijn indexing and expanded to deal with
 -- naming complexity and extensions.
@@ -35,11 +35,11 @@ vars (App l r)    = vars l <> vars r
 vars _            = []
 
 mapVars :: (a -> b) -> Term e c a -> Term e c b
-mapVars _ (Var i) = Var i
-mapVars _ (Const c) = Const c
+mapVars _ (Var i)      = Var i
+mapVars _ (Const c)    = Const c
 mapVars f (Lambda a t) = Lambda (f a) (mapVars f t)
-mapVars f (App l r) = App (mapVars f l) (mapVars f r)
-mapVars _ (Ext e) = Ext e
+mapVars f (App l r)    = App (mapVars f l) (mapVars f r)
+mapVars _ (Ext e)      = Ext e
 
 consts :: Term e c v -> [c]
 consts (Const c)    = [c]
@@ -48,11 +48,11 @@ consts (App l r)    = consts l <> consts r
 consts _            = []
 
 mapConsts :: (a -> b) -> Term e a v -> Term e b v
-mapConsts _ (Var i) = Var i
-mapConsts f (Const c) = Const (f c)
+mapConsts _ (Var i)      = Var i
+mapConsts f (Const c)    = Const (f c)
 mapConsts f (Lambda v t) = Lambda v (mapConsts f t)
-mapConsts f (App l r) = App (mapConsts f l) (mapConsts f r)
-mapConsts _ (Ext e) = Ext e
+mapConsts f (App l r)    = App (mapConsts f l) (mapConsts f r)
+mapConsts _ (Ext e)      = Ext e
 
 termI :: Term e T.Text T.Text
 termI = Lambda "x" (Var 0)
