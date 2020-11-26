@@ -1,6 +1,14 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Props.Lambda.Display
-  ( displayTerm
+  ( findConstNames
+  , makeVarNamesUnique
+  , findVarNames
+  , displayTerm
   ) where
+
+import Data.Maybe
+import           Numeric.Natural
 
 import qualified Data.Text         as T
 
@@ -19,13 +27,36 @@ constNames = chars ++ (mappend <$> constNames <*> chars)
     chars = map T.singleton ['A'..'Z']
 
 findConstNames :: Term e (Maybe Name) v -> Term e Name v
-findConstNames = undefined
+findConstNames = mapConsts (fromMaybe "[]") -- TODO implement
 
 makeVarNamesUnique :: Term e c (Maybe Name) -> Term e c (Maybe Name)
-makeVarNamesUnique = undefined
+makeVarNamesUnique = id -- TODO implement
 
 findVarNames :: Term e c (Maybe Name) -> Term e c Name
-findVarNames = undefined
+findVarNames = mapVars (fromMaybe "[]") -- TODO implement
 
-displayTerm :: (e -> T.Text) -> Term e (Maybe Name) (Maybe Name) -> T.Text
-displayTerm = undefined
+displayTerm :: (e -> T.Text) -> Term e Name Name -> T.Text
+displayTerm f = dTerm f []
+
+nth :: [a] -> Natural -> Maybe a
+nth [] _ = Nothing
+nth (x:_) 0 = Just x
+nth (_:xs) n = nth xs $ n - 1
+
+varName :: [Name] -> Natural -> Name
+varName vs i = fromMaybe e $ nth vs i
+  where
+    e = "[" <> T.pack (show i) <> "]"
+
+dTerm :: (e -> T.Text) -> [Name] -> Term e Name Name -> T.Text
+dTerm _ vs (Var i) = varName vs i
+dTerm _ _  (Const c) = c
+dTerm f vs (Lambda v t) = "λ" <> v <> ". " <> dTerm f (v:vs) t
+dTerm f _  (Ext e) = f e
+dTerm f vs (App l r) = dLeft l <> " " <> dRight r
+  where
+    dLeft t@(Lambda _ _) = "(" <> dTerm f vs t <> ")"
+    dLeft t = dTerm f vs t
+    dRight t@(Lambda _ _) = "(" <> dTerm f vs t <> ")"
+    dRight t@(App _ _) = "(" <> dTerm f vs t <> ")"
+    dRight t = dTerm f vs t
