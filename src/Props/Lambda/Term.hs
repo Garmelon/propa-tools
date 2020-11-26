@@ -1,18 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Props.Lambda.Term
   ( Term(..)
   , vars
   , mapVars
   , consts
   , mapConsts
-  , termI
-  , termY
   ) where
 
 import           Numeric.Natural
-
-import qualified Data.Text       as T
 
 -- | Lambda calculus term using De Bruijn indexing and expanded to deal with
 -- naming complexity and extensions.
@@ -53,11 +47,3 @@ mapConsts f (Const c)    = Const (f c)
 mapConsts f (Lambda v t) = Lambda v (mapConsts f t)
 mapConsts f (App l r)    = App (mapConsts f l) (mapConsts f r)
 mapConsts _ (Ext e)      = Ext e
-
-termI :: Term e T.Text T.Text
-termI = Lambda "x" (Var 0)
-
-termY :: Term e T.Text T.Text
-termY = Lambda "f" $ App
-  (Lambda "x" $ App (Var 1) $ App (Var 0) (Var 0))
-  (Lambda "x" $ App (Var 1) $ App (Var 0) (Var 0))
