@@ -1,4 +1,4 @@
-name: props
+name: propa-tools
 version: 0.1.0.0
 license: MIT
 author: Garmelon <joscha@plugh.de>
@@ -21,7 +21,7 @@ library:
   source-dirs: src
 
 executables:
-  props:
+  propa-tools-exe:
     main: Main.hs
     source-dirs: app
     ghc-options:
@@ -29,4 +29,4 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - props
+    - propa-tools

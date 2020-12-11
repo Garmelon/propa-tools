@@ -2,7 +2,7 @@
 
 -- | This module contains functions useful for displaying 'Term's.
 
-module Props.Lambda.Display
+module Propa.Lambda.Display
   ( Name
   , findConstNames
   , makeVarNamesUnique
@@ -18,7 +18,7 @@ import           Control.Monad.Trans.State
 import qualified Data.Set                  as Set
 import qualified Data.Text                 as T
 
-import           Props.Lambda.Term
+import           Propa.Lambda.Term
 
 -- | The name of a variable or a constant.
 type Name = T.Text

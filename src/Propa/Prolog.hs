@@ -1,4 +1,4 @@
-module Props.Prolog where
+module Propa.Prolog where
 
 import           Control.Monad
 import           Data.Foldable

@@ -1,7 +1,7 @@
 -- | This module contains 'Term', the base type for lambda expressions. It also
 -- contains a few utility functions for operating on it.
 
-module Props.Lambda.Term
+module Propa.Lambda.Term
   ( Term(..)
   , vars
   , mapVars
