@@ -2,6 +2,7 @@
 
 module Propa.Prolog.Unify
   ( run
+  , runOne
   ) where
 
 import           Control.Monad
@@ -51,7 +52,8 @@ lookupVar t@(Var v) = do
 -- Needs to be changed when implementing cuts.
 type UniM = StateT Context []
 
--- | A faster version of 'nub'.
+-- | A faster version of 'nub' that doesn't preserve order and doesn't work on
+-- infinite lists.
 fastNub :: (Ord a) => [a] -> [a]
 fastNub = Set.toList . Set.fromList
 
@@ -72,7 +74,7 @@ understand a = do
   pure (fmap (vmap Map.!) a, vmap)
 
 satisfy :: Term Int -> UniM ()
-satisfy (Var _)          = undefined
+satisfy (Var _) = pure ()
 satisfy (Stat name args) = do
   c <- get
   (Def dName dArgs dTerms, _) <- understand =<< lift (cDb c)
@@ -119,12 +121,23 @@ findVarNaming known terms =
       unknownNaming = Map.fromList $ zip (sort $ Set.toList unknownVars) availVarNames
   in  knownNaming <> unknownNaming
 
-run :: Db T.Text -> Term T.Text -> [Map.Map T.Text (Term T.Text)]
-run db t = map fst $ runStateT helper $ newContext db
+newtype Terms a = Terms { unTerms :: [Term a] }
+
+instance Functor Terms where
+  fmap f (Terms ts) = Terms $ fmap (fmap f) ts
+
+instance Foldable Terms where
+  foldMap f (Terms ts) = foldMap (foldMap f) ts
+
+run :: Db T.Text -> [Term T.Text] -> [Map.Map T.Text (Term T.Text)]
+run db terms = map fst $ runStateT helper $ newContext db
   where
     helper = do
-      (t2, vmap) <- understand t
-      satisfy t2
+      (terms2, vmap) <- understand $ Terms terms
+      satisfyTerms $ unTerms terms2
       tmap <- traverse (lookupVar . Var) vmap
       let naming = findVarNaming vmap $ Map.elems tmap
       pure $ fmap (naming Map.!) <$> tmap
+
+runOne :: Db T.Text -> Term T.Text -> [Map.Map T.Text (Term T.Text)]
+runOne db term = run db [term]
