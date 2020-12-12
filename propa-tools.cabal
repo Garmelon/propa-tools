@@ -22,7 +22,8 @@ library
   exposed-modules:
       Propa.Lambda.Display
       Propa.Lambda.Term
-      Propa.Prolog
+      Propa.Prolog.Types
+      Propa.Prolog.Unify
   other-modules:
       Paths_propa_tools
   hs-source-dirs:

@@ -1,4 +1,9 @@
-module Propa.Prolog where
+module Propa.Prolog.Unify
+  ( Context(..)
+  , newContext
+  , UniM
+  , run
+  ) where
 
 import           Control.Monad
 import           Data.Foldable
@@ -8,37 +13,7 @@ import           Control.Monad.Trans.State
 import qualified Data.Map                  as Map
 import qualified Data.Set                  as Set
 
-data Term a
-  = Var a
-  | Stat String [Term a]
-  deriving (Show)
-
-instance Functor Term where
-  fmap f (Var a)          = Var $ f a
-  fmap f (Stat name args) = Stat name $ fmap (fmap f) args
-
-instance Foldable Term where
-  foldMap f (Var a)       = f a
-  foldMap f (Stat _ args) = foldMap (foldMap f) args
-
-instance Traversable Term where
-  traverse f (Var a)          = Var <$> f a
-  traverse f (Stat name args) = Stat name <$> traverse (traverse f) args
-
-data Def a = Def String [Term a] [Term a]
-  deriving (Show)
-
-instance Functor Def where
-  fmap f (Def dName dArgs dTerms) = Def dName (fmap f <$> dArgs) (fmap f <$> dTerms)
-
-instance Foldable Def where
-  foldMap f (Def _ dArgs dTerms) = foldMap (foldMap f) dArgs <> foldMap (foldMap f) dTerms
-
-instance Traversable Def where
-  traverse f (Def dName dArgs dTerms)
-    =   Def dName
-    <$> traverse (traverse f) dArgs
-    <*> traverse (traverse f) dTerms
+import           Propa.Prolog.Types
 
 data Context = Context
   { cDb     :: [Def String]
@@ -128,16 +103,3 @@ run t = do
   (t2, vmap) <- understand t
   satisfy t2
   traverse (lookupVar . Var) vmap
-
-exampleDb :: [Def String]
-exampleDb =
-  [ Def "food" [Stat "burger" []] []
-  , Def "food" [Stat "sandwich" []] []
-  , Def "meal" [Var "X"] [Stat "food" [Var "X"]]
-  ]
-
-burgerIsMeal :: Term String
-burgerIsMeal = Stat "meal" [Stat "burger" []]
-
-whatIsMeal :: Term String
-whatIsMeal = Stat "meal" [Var "X"]
