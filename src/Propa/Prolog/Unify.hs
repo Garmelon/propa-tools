@@ -1,12 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Propa.Prolog.Unify
-  ( Context(..)
-  , newContext
-  , UniM
-  , run
+  ( run
   ) where
 
 import           Control.Monad
 import           Data.Foldable
+import           Data.List
+import           Data.Tuple
 
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State
@@ -32,10 +33,10 @@ learnVar k v = modify $ \c -> c{cVars = Map.insert k v $ cVars c}
 learnTerm :: Int -> T.Text -> [Term Int] -> UniM ()
 learnTerm k name args = modify $ \c -> c{cTerms = Map.insert k (name, args) $ cTerms c}
 
--- | Look up a variable, first in the var map and then the term map. Returns
--- statements unchanged.
+-- | Look up a variable, first repeatedly in the var map and then the term map.
+-- Returns statements unchanged.
 --
--- If this returns a variable, then that variable is unbound.
+-- If this returns a variable, then that variable is not bound.
 lookupVar :: Term Int -> UniM (Term Int)
 lookupVar t@(Stat _ _) = pure t
 lookupVar t@(Var v) = do
@@ -99,8 +100,31 @@ unifyTerms t1 t2 = do
   lift $ guard $ length t1 == length t2
   sequenceA_ $ zipWith unify t1 t2
 
-run :: Term T.Text -> UniM (Map.Map T.Text (Term Int))
-run t = do
-  (t2, vmap) <- understand t
-  satisfy t2
-  traverse (lookupVar . Var) vmap
+varNames :: [T.Text]
+varNames = do
+  num <- "" : map (T.pack . show) [(1::Integer)..]
+  char <- alphabet
+  pure $ char <> num
+  where
+    alphabet = map T.singleton ['A'..'Z']
+
+findVarNaming :: Map.Map T.Text Int -> [Term Int] -> Map.Map Int T.Text
+findVarNaming known terms =
+  let knownNaming = Map.fromList $ map swap $ Map.toList known
+      knownNames = Map.keysSet known
+      knownVars = Map.keysSet knownNaming
+      termVars = Set.fromList $ concatMap toList terms
+      unknownVars = termVars Set.\\ knownVars
+      availVarNames = filter (not . (`Set.member` knownNames)) varNames
+      unknownNaming = Map.fromList $ zip (sort $ Set.toList unknownVars) availVarNames
+  in  knownNaming <> unknownNaming
+
+run :: Db T.Text -> Term T.Text -> [Map.Map T.Text (Term T.Text)]
+run db t = map fst $ runStateT helper $ newContext db
+  where
+    helper = do
+      (t2, vmap) <- understand t
+      satisfy t2
+      tmap <- traverse (lookupVar . Var) vmap
+      let naming = findVarNaming vmap $ Map.elems tmap
+      pure $ fmap (naming Map.!) <$> tmap
