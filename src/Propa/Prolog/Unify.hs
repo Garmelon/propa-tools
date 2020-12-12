@@ -12,23 +12,24 @@ import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State
 import qualified Data.Map                  as Map
 import qualified Data.Set                  as Set
+import qualified Data.Text                 as T
 
 import           Propa.Prolog.Types
 
 data Context = Context
-  { cDb     :: [Def String]
+  { cDb     :: Db T.Text
   , cVarIdx :: Int
   , cVars   :: Map.Map Int Int
-  , cTerms  :: Map.Map Int (String, [Term Int])
+  , cTerms  :: Map.Map Int (T.Text, [Term Int])
   } deriving (Show)
 
-newContext :: [Def String] -> Context
+newContext :: [Def T.Text] -> Context
 newContext db = Context db 0 Map.empty Map.empty
 
 learnVar :: Int -> Int -> UniM ()
 learnVar k v = modify $ \c -> c{cVars = Map.insert k v $ cVars c}
 
-learnTerm :: Int -> String -> [Term Int] -> UniM ()
+learnTerm :: Int -> T.Text -> [Term Int] -> UniM ()
 learnTerm k name args = modify $ \c -> c{cTerms = Map.insert k (name, args) $ cTerms c}
 
 -- | Look up a variable, first in the var map and then the term map. Returns
@@ -53,7 +54,7 @@ type UniM = StateT Context []
 fastNub :: (Ord a) => [a] -> [a]
 fastNub = Set.toList . Set.fromList
 
-varMap :: (Foldable a) => a String -> UniM (Map.Map String Int)
+varMap :: (Foldable a) => a T.Text -> UniM (Map.Map T.Text Int)
 varMap a = do
   c <- get
   let i = cVarIdx c
@@ -64,7 +65,7 @@ varMap a = do
 
 -- | Convert a definition's variables to unique integers that are not already in
 -- use in the current context.
-understand :: (Functor a, Foldable a) => a String -> UniM (a Int, Map.Map String Int)
+understand :: (Functor a, Foldable a) => a T.Text -> UniM (a Int, Map.Map T.Text Int)
 understand a = do
   vmap <- varMap a
   pure (fmap (vmap Map.!) a, vmap)
@@ -98,7 +99,7 @@ unifyTerms t1 t2 = do
   lift $ guard $ length t1 == length t2
   sequenceA_ $ zipWith unify t1 t2
 
-run :: Term String -> UniM (Map.Map String (Term Int))
+run :: Term T.Text -> UniM (Map.Map T.Text (Term Int))
 run t = do
   (t2, vmap) <- understand t
   satisfy t2

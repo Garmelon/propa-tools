@@ -1,11 +1,14 @@
 module Propa.Prolog.Types
   ( Term(..)
   , Def(..)
+  , Db
   ) where
+
+import qualified Data.Text as T
 
 data Term a
   = Var a
-  | Stat String [Term a]
+  | Stat T.Text [Term a]
   deriving (Show)
 
 instance Functor Term where
@@ -20,7 +23,7 @@ instance Traversable Term where
   traverse f (Var a)          = Var <$> f a
   traverse f (Stat name args) = Stat name <$> traverse (traverse f) args
 
-data Def a = Def String [Term a] [Term a]
+data Def a = Def T.Text [Term a] [Term a]
   deriving (Show)
 
 instance Functor Def where
@@ -34,3 +37,5 @@ instance Traversable Def where
     =   Def dName
     <$> traverse (traverse f) dArgs
     <*> traverse (traverse f) dTerms
+
+type Db a = [Def a]
