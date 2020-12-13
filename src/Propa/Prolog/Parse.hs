@@ -72,7 +72,7 @@ pDefs = many pDef
 parseHelper :: Parser a -> FilePath -> T.Text -> Either T.Text a
 parseHelper p path input
   = first (T.pack . errorBundlePretty)
-  $ parse (space *> p) path input
+  $ parse (space *> p <* eof) path input
 
 parseTerms :: FilePath -> T.Text -> Either T.Text [Term T.Text]
 parseTerms = parseHelper pTerms
