@@ -22,6 +22,7 @@ library
   exposed-modules:
       Propa.Lambda.Display
       Propa.Lambda.Term
+      Propa.Prolog.Debug
       Propa.Prolog.Display
       Propa.Prolog.Example
       Propa.Prolog.Parse
