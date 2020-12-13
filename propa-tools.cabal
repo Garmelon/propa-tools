@@ -24,6 +24,7 @@ library
       Propa.Lambda.Term
       Propa.Prolog.Display
       Propa.Prolog.Example
+      Propa.Prolog.Parse
       Propa.Prolog.Types
       Propa.Prolog.Unify
   other-modules:
@@ -33,6 +34,7 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , megaparsec
     , text
     , transformers
   default-language: Haskell2010
@@ -47,6 +49,7 @@ executable propa-tools-exe
   build-depends:
       base >=4.7 && <5
     , containers
+    , megaparsec
     , propa-tools
     , text
     , transformers
