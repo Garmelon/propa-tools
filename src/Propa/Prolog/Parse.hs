@@ -57,6 +57,7 @@ pTermToStat p = do
     (TVar _)  -> fail "expected term, not variable"
     (TStat s) -> pure s
 
+-- | Parse a statement of the form @name(args)@.
 pPlainStat :: Parser (Stat T.Text)
 pPlainStat = do
   name <- pName
@@ -64,7 +65,7 @@ pPlainStat = do
   pure $ Stat name terms
 
 pStat :: Parser (Stat T.Text)
-pStat = pPlainStat <|> pTermToStat pExpr
+pStat = pPlainStat <|> pTermToStat pTerm
 
 pStats :: Parser [Stat T.Text]
 pStats = (pStat `sepBy1` symbol ",") <* symbol "."
@@ -83,16 +84,17 @@ pList = do
   elems <- brackets $ pTerm `sepBy` symbol ","
   pure $ foldr (\a b -> TStat $ Stat "[|]" [a, b]) (TStat $ Stat "[]" []) elems
 
-pTerm :: Parser (Term T.Text)
-pTerm
+-- | Parse a term that is not an expression.
+pPlainTerm :: Parser (Term T.Text)
+pPlainTerm
   =   (TVar <$> pVarName)
   <|> (TStat <$> pPlainStat)
   <|> try pCons
   <|> pList
-  <|> parens pExpr
+  <|> parens pTerm
 
-pExpr :: Parser (Term T.Text)
-pExpr = makeExprParser pTerm
+pTerm :: Parser (Term T.Text)
+pTerm = makeExprParser pPlainTerm
   [ [ binary "=" ]
   ]
   where
