@@ -9,7 +9,7 @@ import qualified Data.Text as T
 data Term a
   = Var a
   | Stat T.Text [Term a]
-  deriving (Show)
+  deriving (Show, Eq)
 
 instance Functor Term where
   fmap f (Var a)          = Var $ f a
