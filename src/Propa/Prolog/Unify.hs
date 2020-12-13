@@ -2,7 +2,6 @@
 
 module Propa.Prolog.Unify
   ( run
-  , runOne
   ) where
 
 import           Control.Monad
@@ -36,30 +35,30 @@ data Context = Context
   { cDb     :: Db T.Text
   , cVarIdx :: Int
   , cVars   :: Map.Map Int Int
-  , cTerms  :: Map.Map Int (T.Text, [Term Int])
+  , cStats  :: Map.Map Int (Stat Int)
   } deriving (Show)
 
 newContext :: [Def T.Text] -> Context
 newContext db = Context db 0 Map.empty Map.empty
 
-learnVar :: Int -> Int -> UniM ()
-learnVar k v = modify $ \c -> c{cVars = Map.insert k v $ cVars c}
+bindVar :: Int -> Int -> UniM ()
+bindVar k v = modify $ \c -> c{cVars = Map.insert k v $ cVars c}
 
-learnTerm :: Int -> T.Text -> [Term Int] -> UniM ()
-learnTerm k name args = modify $ \c -> c{cTerms = Map.insert k (name, args) $ cTerms c}
+bindStat :: Int -> Stat Int -> UniM ()
+bindStat k s = modify $ \c -> c{cStats = Map.insert k s $ cStats c}
 
 -- | Look up a variable, first repeatedly in the var map and then the term map.
 -- Returns statements unchanged.
 --
 -- If this returns a variable, then that variable is not bound.
 lookupVar :: Term Int -> UniM (Term Int)
-lookupVar (Var v) = do
+lookupVar (TVar v) = do
   c <- get
   let lastV = follow (cVars c) v
-  pure $ case cTerms c Map.!? lastV of
-    Nothing           -> Var lastV
-    Just (name, args) -> Stat name args
-lookupVar t@(Stat _ _) = pure t
+  pure $ case cStats c Map.!? lastV of
+    Nothing -> TVar lastV
+    Just s  -> TStat s
+lookupVar t@(TStat _) = pure t
 
 -- | A simple state monad transformer over the list monad for easy backtracking.
 -- Needs to be changed when implementing cuts.
@@ -81,33 +80,34 @@ understand a = do
   vmap <- varMap a
   pure (fmap (vmap Map.!) a, vmap)
 
-satisfy :: Term Int -> UniM ()
-satisfy (Var _) = pure ()
-satisfy (Stat name args) = do
+satisfy :: Stat Int -> UniM ()
+satisfy s = do
   c <- get
-  (Def dName dArgs dTerms, _) <- understand =<< lift (cDb c)
-  lift $ guard $ name == dName -- Not sure if 'lift' is really necessary
-  unifyTerms args dArgs
-  satisfyTerms dTerms
+  (Def dStat dStats, _) <- understand =<< lift (cDb c)
+  unifyStat s dStat
+  satisfyStats dStats
 
-satisfyTerms :: [Term Int] -> UniM ()
-satisfyTerms = traverse_ satisfy
+satisfyStats :: [Stat Int] -> UniM ()
+satisfyStats = traverse_ satisfy
+
+unifyStat :: Stat Int -> Stat Int -> UniM ()
+unifyStat (Stat name1 args1) (Stat name2 args2) = do
+  guard $ name1 == name2
+  unifyTerms args1 args2
 
 unify :: Term Int -> Term Int -> UniM ()
 unify t1 t2 = do
   t1' <- lookupVar t1
   t2' <- lookupVar t2
   case (t1', t2') of
-    (Stat name1 args1, Stat name2 args2) -> do
-      lift $ guard $ name1 == name2
-      unifyTerms args1 args2
-    (Var v1, Stat name2 args2) -> learnTerm v1 name2 args2
-    (Stat name1 args1, Var v2) -> learnTerm v2 name1 args1
-    (Var v1, Var v2) -> learnVar v1 v2 -- The order shouldn't really matter
+    (TStat s1, TStat s2) -> unifyStat s1 s2
+    (TVar v, TStat s)    -> bindStat v s
+    (TStat s, TVar v)    -> bindStat v s
+    (TVar v1, TVar v2)   -> bindVar v1 v2 -- The order shouldn't really matter
 
 unifyTerms :: [Term Int] -> [Term Int] -> UniM ()
 unifyTerms t1 t2 = do
-  lift $ guard $ length t1 == length t2
+  guard $ length t1 == length t2
   sequenceA_ $ zipWith unify t1 t2
 
 -- Figuring out how to display the result of the unification
@@ -136,30 +136,26 @@ resolveVars :: Term Int -> UniM (Term Int)
 resolveVars t = do
   t2 <- lookupVar t
   case t2 of
-    (Var v) -> pure $ Var v
-    (Stat name args) -> do
-      args2 <- traverse resolveVars args
-      pure $ Stat name args2
+    (TVar v) -> pure $ TVar v
+    (TStat (Stat name args)) -> TStat . Stat name <$> traverse resolveVars args
 
--- | Helper type so I can resolve variables in multiple terms simultaneously.
-newtype Terms a = Terms { unTerms :: [Term a] }
+-- | Helper type so I can resolve variables in multiple statements
+-- simultaneously.
+newtype Stats a = Stats { unStats :: [Stat a] }
 
-instance Functor Terms where
-  fmap f (Terms ts) = Terms $ fmap (fmap f) ts
+instance Functor Stats where
+  fmap f (Stats ts) = Stats $ fmap (fmap f) ts
 
-instance Foldable Terms where
-  foldMap f (Terms ts) = foldMap (foldMap f) ts
+instance Foldable Stats where
+  foldMap f (Stats ts) = foldMap (foldMap f) ts
 
-run :: Db T.Text -> [Term T.Text] -> [Map.Map T.Text (Term T.Text)]
-run db terms = map fst $ runStateT helper $ newContext db
+run :: Db T.Text -> [Stat T.Text] -> [Map.Map T.Text (Term T.Text)]
+run db stats = map fst $ runStateT helper $ newContext db
   where
     helper = do
-      (terms2, vmap) <- understand $ Terms terms
-      satisfyTerms $ unTerms terms2
-      tmap <- traverse (resolveVars . Var) vmap
+      (stats2, vmap) <- understand $ Stats stats
+      satisfyStats $ unStats stats2
+      tmap <- traverse (resolveVars . TVar) vmap
       c <- get
       let naming = findVarNaming vmap (cVars c) $ Map.elems tmap
       pure $ fmap (naming Map.!) <$> tmap
-
-runOne :: Db T.Text -> Term T.Text -> [Map.Map T.Text (Term T.Text)]
-runOne db term = run db [term]

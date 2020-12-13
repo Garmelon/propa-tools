@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Propa.Prolog.Parse
-  ( parseTerms
+  ( parseStats
   , parseDb
   ) where
 
@@ -53,23 +53,26 @@ pCons = brackets $ do
   elems <- pTerm `sepBy1` symbol ","
   void $ symbol "|"
   rest <- pTerm
-  pure $ foldr (\a b -> Stat "[|]" [a, b]) rest elems
+  pure $ foldr (\a b -> TStat $ Stat "[|]" [a, b]) rest elems
 
 pList :: Parser (Term T.Text)
 pList = do
   elems <- brackets $ pTerm `sepBy` symbol ","
-  pure $ foldr (\a b -> Stat "[|]" [a, b]) (Stat "[]" []) elems
+  pure $ foldr (\a b -> TStat $ Stat "[|]" [a, b]) (TStat $ Stat "[]" []) elems
 
-pStat :: Parser (T.Text, [Term T.Text])
+pStat :: Parser (Stat T.Text)
 pStat = do
   name <- pName
   terms <- parens (pTerm `sepBy1` symbol ",") <|> pure []
-  pure (name, terms)
+  pure $ Stat name terms
+
+pStats :: Parser [Stat T.Text]
+pStats = (pStat `sepBy1` symbol ",") <* symbol "."
 
 pTerm :: Parser (Term T.Text)
 pTerm
-  =   (Var <$> pVarName)
-  <|> (uncurry Stat <$> pStat)
+  =   (TVar <$> pVarName)
+  <|> (TStat <$> pStat)
   <|> try pCons
   <|> pList
   <|> parens pExpr
@@ -79,18 +82,14 @@ pExpr = makeExprParser pTerm
   [ [ binary "=" ]
   ]
   where
-    binary name = InfixL $ (\a b -> Stat name [a, b]) <$ symbol name
-
-pTerms :: Parser [Term T.Text]
-pTerms = (pExpr `sepBy1` symbol ",") <* symbol "."
+    binary name = InfixL $ (\a b -> TStat $ Stat name [a, b]) <$ symbol name
 
 pDef :: Parser (Def T.Text)
 pDef = do
-  name <- pName
-  args <- parens (pExpr `sepBy1` symbol ",") <|> pure []
-  terms <- (symbol ":-" *> (pExpr `sepBy1` symbol ",")) <|> pure []
+  stat <- pStat
+  stats <- (symbol ":-" *> (pStat `sepBy1` symbol ",")) <|> pure []
   void $ symbol "."
-  pure $ Def name args terms
+  pure $ Def stat stats
 
 pDefs :: Parser [Def T.Text]
 pDefs = many pDef
@@ -102,8 +101,8 @@ parseHelper p path input
   = first (T.pack . errorBundlePretty)
   $ parse (space *> p <* eof) path input
 
-parseTerms :: FilePath -> T.Text -> Either T.Text [Term T.Text]
-parseTerms = parseHelper pTerms
+parseStats :: FilePath -> T.Text -> Either T.Text [Stat T.Text]
+parseStats = parseHelper pStats
 
 parseDb :: FilePath -> T.Text -> Either T.Text (Db T.Text)
 parseDb = parseHelper pDefs

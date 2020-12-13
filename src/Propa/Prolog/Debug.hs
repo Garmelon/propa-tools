@@ -12,7 +12,7 @@ import           Propa.Prolog.Parse
 import           Propa.Prolog.Unify
 
 parseAndRun :: T.Text -> T.Text -> IO ()
-parseAndRun dbText termsText = T.putStrLn $ either id id $ do
+parseAndRun dbText statsText = T.putStrLn $ either id id $ do
   db <- parseDb "<input>" dbText
-  terms <- parseTerms "<input>" termsText
-  pure $ T.intercalate "\n" $ map displayResult $ run db terms
+  stats <- parseStats "<input>" statsText
+  pure $ T.intercalate "\n" $ map displayResult $ run db stats

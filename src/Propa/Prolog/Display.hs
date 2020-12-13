@@ -28,33 +28,33 @@ displayName name
       , ("\t", "\\t")
       ]
 
-displayStat :: T.Text -> [Term T.Text] -> T.Text
-displayStat name [] = displayName name
-displayStat name args
+displayStat :: Stat T.Text -> T.Text
+displayStat (Stat "[|]" [a, b]) = "[" <> displayTerm a <> displayList b
+displayStat (Stat name []) = displayName name
+displayStat (Stat name args)
   = displayName name
   <> "("
   <> T.intercalate ", " (map displayTerm args)
   <> ")"
 
 displayList :: Term T.Text -> T.Text
-displayList (Stat "[|]" [a, b]) = "," <> displayTerm a <> displayList b
-displayList (Stat "[]" [])      = "]"
-displayList t                   = "|" <> displayTerm t <> "]"
+displayList (TStat (Stat "[|]" [a, b])) = "," <> displayTerm a <> displayList b
+displayList (TStat (Stat "[]" []))      = "]"
+displayList t                           = "|" <> displayTerm t <> "]"
 
 displayTerm :: Term T.Text -> T.Text
-displayTerm (Var v)             = v
-displayTerm (Stat "[|]" [a, b]) = "[" <> displayTerm a <> displayList b
-displayTerm (Stat name args)    = displayStat name args
+displayTerm (TVar v)  = v
+displayTerm (TStat s) = displayStat s
 
 displayTerms :: [Term T.Text] -> T.Text
 displayTerms terms = T.intercalate ",\n" (map displayTerm terms) <> "."
 
 displayDef :: Def T.Text -> T.Text
-displayDef (Def name args []) = displayStat name args <> "."
-displayDef (Def name args terms)
-  =  displayStat name args
+displayDef (Def stat []) = displayStat stat <> "."
+displayDef (Def stat stats)
+  =  displayStat stat
   <> " :-\n"
-  <> T.intercalate ",\n" (map (\t -> "    " <> displayTerm t) terms)
+  <> T.intercalate ",\n" (map (\t -> "    " <> displayStat t) stats)
   <> "."
 
 displayDefs :: [Def T.Text] -> T.Text
@@ -64,5 +64,5 @@ displayResult :: Map.Map T.Text (Term T.Text) -> T.Text
 displayResult
   = T.intercalate "\n"
   . map (\(k, v) -> k <> " = " <> displayTerm v)
-  . filter (\(k, v) -> v /= Var k)
+  . filter (\(k, v) -> v /= TVar k)
   . Map.assocs
