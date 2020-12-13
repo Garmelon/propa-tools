@@ -37,7 +37,7 @@ parens = between (symbol "(") (symbol ")")
 brackets :: Parser a -> Parser a
 brackets = between (symbol "[") (symbol "]")
 
--- Building blocks
+-- Names
 
 pName :: Parser T.Text
 pName = lexeme $ unquotedName <|> quotedName
@@ -47,6 +47,29 @@ pName = lexeme $ unquotedName <|> quotedName
 
 pVarName :: Parser T.Text
 pVarName = lexeme $ takeWhile1P (Just "uppercase character") isUpper
+
+-- Statements
+
+pTermToStat :: Parser (Term T.Text) -> Parser (Stat T.Text)
+pTermToStat p = do
+  term <- p
+  case term of
+    (TVar _)  -> fail "expected term, not variable"
+    (TStat s) -> pure s
+
+pPlainStat :: Parser (Stat T.Text)
+pPlainStat = do
+  name <- pName
+  terms <- parens (pTerm `sepBy1` symbol ",") <|> pure []
+  pure $ Stat name terms
+
+pStat :: Parser (Stat T.Text)
+pStat = pPlainStat <|> pTermToStat pExpr
+
+pStats :: Parser [Stat T.Text]
+pStats = (pStat `sepBy1` symbol ",") <* symbol "."
+
+-- Terms
 
 pCons :: Parser (Term T.Text)
 pCons = brackets $ do
@@ -60,19 +83,10 @@ pList = do
   elems <- brackets $ pTerm `sepBy` symbol ","
   pure $ foldr (\a b -> TStat $ Stat "[|]" [a, b]) (TStat $ Stat "[]" []) elems
 
-pStat :: Parser (Stat T.Text)
-pStat = do
-  name <- pName
-  terms <- parens (pTerm `sepBy1` symbol ",") <|> pure []
-  pure $ Stat name terms
-
-pStats :: Parser [Stat T.Text]
-pStats = (pStat `sepBy1` symbol ",") <* symbol "."
-
 pTerm :: Parser (Term T.Text)
 pTerm
   =   (TVar <$> pVarName)
-  <|> (TStat <$> pStat)
+  <|> (TStat <$> pPlainStat)
   <|> try pCons
   <|> pList
   <|> parens pExpr
@@ -83,6 +97,8 @@ pExpr = makeExprParser pTerm
   ]
   where
     binary name = InfixL $ (\a b -> TStat $ Stat name [a, b]) <$ symbol name
+
+-- Definitions
 
 pDef :: Parser (Def T.Text)
 pDef = do
