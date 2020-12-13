@@ -33,6 +33,9 @@ symbol = L.symbol space
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
+brackets :: Parser a -> Parser a
+brackets = between (symbol "[") (symbol "]")
+
 -- Building blocks
 
 pName :: Parser T.Text
@@ -44,6 +47,18 @@ pName = lexeme $ unquotedName <|> quotedName
 pVarName :: Parser T.Text
 pVarName = lexeme $ takeWhile1P (Just "uppercase character") isUpper
 
+pCons :: Parser (Term T.Text)
+pCons = brackets $ do
+  elems <- pTerm `sepBy1` symbol ","
+  void $ symbol "|"
+  rest <- pTerm
+  pure $ foldr (\a b -> Stat "[|]" [a, b]) rest elems
+
+pList :: Parser (Term T.Text)
+pList = do
+  elems <- brackets $ pTerm `sepBy` symbol ","
+  pure $ foldr (\a b -> Stat "[|]" [a, b]) (Stat "[]" []) elems
+
 pStat :: Parser (T.Text, [Term T.Text])
 pStat = do
   name <- pName
@@ -51,7 +66,11 @@ pStat = do
   pure (name, terms)
 
 pTerm :: Parser (Term T.Text)
-pTerm = (Var <$> pVarName) <|> (uncurry Stat <$> pStat)
+pTerm
+  =   (Var <$> pVarName)
+  <|> (uncurry Stat <$> pStat)
+  <|> try pCons
+  <|> pList
 
 pTerms :: Parser [Term T.Text]
 pTerms = (pTerm `sepBy1` symbol ",") <* symbol "."
