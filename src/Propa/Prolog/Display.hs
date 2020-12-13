@@ -8,14 +8,33 @@ module Propa.Prolog.Display
   , displayResult
   ) where
 
+import           Data.Char
+import           Data.List
+
 import qualified Data.Map           as Map
 import qualified Data.Text          as T
 
 import           Propa.Prolog.Types
 
+displayName :: T.Text -> T.Text
+displayName name
+  | T.all isLower name = name
+  | otherwise          = "\"" <> escaped <> "\""
+  where
+    escaped = foldl' (\s (a, b) -> T.replace a b s) name
+      [ ("\\", "\\\\")
+      , ("\n", "\\n")
+      , ("\r", "\\r")
+      , ("\t", "\\t")
+      ]
+
 displayStat :: T.Text -> [Term T.Text] -> T.Text
-displayStat name []   = name
-displayStat name args = name <> "(" <> T.intercalate ", " (map displayTerm args) <> ")"
+displayStat name [] = displayName name
+displayStat name args
+  = displayName name
+  <> "("
+  <> T.intercalate ", " (map displayTerm args)
+  <> ")"
 
 displayList :: Term T.Text -> T.Text
 displayList (Stat "[|]" [a, b]) = "," <> displayTerm a <> displayList b
