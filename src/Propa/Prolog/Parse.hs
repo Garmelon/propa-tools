@@ -42,7 +42,7 @@ pName :: Parser T.Text
 pName = lexeme $ unquotedName <|> quotedName
   where
     unquotedName = takeWhile1P (Just "lowercase character") isLower
-    quotedName = fmap T.pack $ C.char '"' *> manyTill L.charLiteral (C.char '"')
+    quotedName = fmap T.pack $ C.char '\'' *> manyTill L.charLiteral (C.char '\'')
 
 pVarName :: Parser T.Text
 pVarName = lexeme $ takeWhile1P (Just "uppercase character") isUpper
