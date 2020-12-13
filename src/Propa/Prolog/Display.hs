@@ -61,8 +61,9 @@ displayDefs :: [Def T.Text] -> T.Text
 displayDefs = T.intercalate "\n" . map displayDef
 
 displayResult :: Map.Map T.Text (Term T.Text) -> T.Text
-displayResult
+displayResult m | Map.null m = "Yes."
+displayResult m
   = T.intercalate "\n"
-  . map (\(k, v) -> k <> " = " <> displayTerm v)
-  . filter (\(k, v) -> v /= TVar k)
-  . Map.assocs
+  $ map (\(k, v) -> k <> " = " <> displayTerm v)
+  $ filter (\(k, v) -> v /= TVar k)
+  $ Map.assocs m

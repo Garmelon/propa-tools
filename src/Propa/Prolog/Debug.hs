@@ -12,7 +12,12 @@ import           Propa.Prolog.Parse
 import           Propa.Prolog.Unify
 
 parseAndRun :: T.Text -> T.Text -> IO ()
-parseAndRun dbText statsText = T.putStrLn $ either id id $ do
-  db <- parseDb "<input>" dbText
-  stats <- parseStats "<input>" statsText
-  pure $ T.intercalate "\n" $ map displayResult $ run db stats
+parseAndRun dbText statsText = T.putStrLn $ case results of
+  Left e   -> e
+  Right [] -> "No."
+  Right rs -> T.intercalate "\n" rs
+  where
+    results = do
+      db <- parseDb "<input>" dbText
+      stats <- parseStats "<input>" statsText
+      pure $ map displayResult $ run db stats
