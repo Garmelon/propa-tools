@@ -17,9 +17,15 @@ displayStat :: T.Text -> [Term T.Text] -> T.Text
 displayStat name []   = name
 displayStat name args = name <> "(" <> T.intercalate ", " (map displayTerm args) <> ")"
 
+displayList :: Term T.Text -> T.Text
+displayList (Stat "[|]" [a, b]) = "," <> displayTerm a <> displayList b
+displayList (Stat "[]" [])      = "]"
+displayList t                   = "|" <> displayTerm t <> "]"
+
 displayTerm :: Term T.Text -> T.Text
-displayTerm (Var v)          = v
-displayTerm (Stat name args) = displayStat name args
+displayTerm (Var v)             = v
+displayTerm (Stat "[|]" [a, b]) = "[" <> displayTerm a <> displayList b
+displayTerm (Stat name args)    = displayStat name args
 
 displayTerms :: [Term T.Text] -> T.Text
 displayTerms terms = T.intercalate ",\n" (map displayTerm terms) <> "."
