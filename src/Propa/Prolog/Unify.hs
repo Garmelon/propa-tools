@@ -18,6 +18,20 @@ import qualified Data.Text                 as T
 
 import           Propa.Prolog.Types
 
+-- General utility functions
+
+-- | Start at a value and follow the map's entries until the end of the chain of
+-- references.
+follow :: (Ord a) => Map.Map a a -> a -> a
+follow m v = maybe v (follow m) $ m Map.!? v
+
+-- | Deduplicates the elements of a finite list. Doesn't preserve the order of
+-- the elements. Doesn't work on infinite lists.
+deduplicate :: (Ord a) => [a] -> [a]
+deduplicate = Set.toList . Set.fromList
+
+-- Now the fun begins...
+
 data Context = Context
   { cDb     :: Db T.Text
   , cVarIdx :: Int
@@ -39,29 +53,23 @@ learnTerm k name args = modify $ \c -> c{cTerms = Map.insert k (name, args) $ cT
 --
 -- If this returns a variable, then that variable is not bound.
 lookupVar :: Term Int -> UniM (Term Int)
-lookupVar t@(Stat _ _) = pure t
-lookupVar t@(Var v) = do
+lookupVar (Var v) = do
   c <- get
-  case cVars c Map.!? v of
-    Just v' -> lookupVar (Var v')
-    Nothing -> pure $ case cTerms c Map.!? v of
-      Nothing           -> t
-      Just (name, args) -> Stat name args
+  let lastV = follow (cVars c) v
+  pure $ case cTerms c Map.!? lastV of
+    Nothing           -> Var lastV
+    Just (name, args) -> Stat name args
+lookupVar t@(Stat _ _) = pure t
 
 -- | A simple state monad transformer over the list monad for easy backtracking.
 -- Needs to be changed when implementing cuts.
 type UniM = StateT Context []
 
--- | A faster version of 'nub' that doesn't preserve order and doesn't work on
--- infinite lists.
-fastNub :: (Ord a) => [a] -> [a]
-fastNub = Set.toList . Set.fromList
-
 varMap :: (Foldable a) => a T.Text -> UniM (Map.Map T.Text Int)
 varMap a = do
   c <- get
   let i = cVarIdx c
-      vars = fastNub $ toList a
+      vars = deduplicate $ toList a
       vmap = Map.fromList $ zip vars [i..]
   put c{cVarIdx = i + Map.size vmap}
   pure vmap
@@ -110,9 +118,10 @@ varNames = do
   where
     alphabet = map T.singleton ['A'..'Z']
 
-findVarNaming :: Map.Map T.Text Int -> [Term Int] -> Map.Map Int T.Text
-findVarNaming known terms =
-  let knownNaming = Map.fromList $ map swap $ Map.toList known
+findVarNaming :: Map.Map T.Text Int -> Map.Map Int Int -> [Term Int] -> Map.Map Int T.Text
+findVarNaming known vars terms =
+  let knownLookedUp = fmap (follow vars) known
+      knownNaming = Map.fromList $ reverse $ map swap $ Map.toList knownLookedUp
       knownNames = Map.keysSet known
       knownVars = Map.keysSet knownNaming
       termVars = Set.fromList $ concatMap toList terms
@@ -120,6 +129,15 @@ findVarNaming known terms =
       availVarNames = filter (not . (`Set.member` knownNames)) varNames
       unknownNaming = Map.fromList $ zip (sort $ Set.toList unknownVars) availVarNames
   in  knownNaming <> unknownNaming
+
+resolveVars :: Term Int -> UniM (Term Int)
+resolveVars t = do
+  t2 <- lookupVar t
+  case t2 of
+    (Var v) -> pure $ Var v
+    (Stat name args) -> do
+      args2 <- traverse resolveVars args
+      pure $ Stat name args2
 
 newtype Terms a = Terms { unTerms :: [Term a] }
 
@@ -135,8 +153,9 @@ run db terms = map fst $ runStateT helper $ newContext db
     helper = do
       (terms2, vmap) <- understand $ Terms terms
       satisfyTerms $ unTerms terms2
-      tmap <- traverse (lookupVar . Var) vmap
-      let naming = findVarNaming vmap $ Map.elems tmap
+      tmap <- traverse (resolveVars . Var) vmap
+      c <- get
+      let naming = findVarNaming vmap (cVars c) $ Map.elems tmap
       pure $ fmap (naming Map.!) <$> tmap
 
 runOne :: Db T.Text -> Term T.Text -> [Map.Map T.Text (Term T.Text)]
