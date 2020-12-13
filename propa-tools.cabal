@@ -24,7 +24,6 @@ library
       Propa.Lambda.Term
       Propa.Prolog.Debug
       Propa.Prolog.Display
-      Propa.Prolog.Example
       Propa.Prolog.Parse
       Propa.Prolog.Types
       Propa.Prolog.Unify
