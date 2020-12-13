@@ -10,10 +10,11 @@ import           Data.Bifunctor
 import           Data.Char
 import           Data.Void
 
-import qualified Data.Text                  as T
+import           Control.Monad.Combinators.Expr
+import qualified Data.Text                      as T
 import           Text.Megaparsec
-import qualified Text.Megaparsec.Char       as C
-import qualified Text.Megaparsec.Char.Lexer as L
+import qualified Text.Megaparsec.Char           as C
+import qualified Text.Megaparsec.Char.Lexer     as L
 
 import           Propa.Prolog.Types
 
@@ -71,15 +72,23 @@ pTerm
   <|> (uncurry Stat <$> pStat)
   <|> try pCons
   <|> pList
+  <|> parens pExpr
+
+pExpr :: Parser (Term T.Text)
+pExpr = makeExprParser pTerm
+  [ [ binary "=" ]
+  ]
+  where
+    binary name = InfixL $ (\a b -> Stat name [a, b]) <$ symbol name
 
 pTerms :: Parser [Term T.Text]
-pTerms = (pTerm `sepBy1` symbol ",") <* symbol "."
+pTerms = (pExpr `sepBy1` symbol ",") <* symbol "."
 
 pDef :: Parser (Def T.Text)
 pDef = do
   name <- pName
-  args <- parens (pTerm `sepBy1` symbol ",") <|> pure []
-  terms <- (symbol ":-" *> (pTerm `sepBy1` symbol ",")) <|> pure []
+  args <- parens (pExpr `sepBy1` symbol ",") <|> pure []
+  terms <- (symbol ":-" *> (pExpr `sepBy1` symbol ",")) <|> pure []
   void $ symbol "."
   pure $ Def name args terms
 
