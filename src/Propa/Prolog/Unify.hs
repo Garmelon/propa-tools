@@ -51,14 +51,14 @@ bindStat k s = modify $ \c -> c{cStats = Map.insert k s $ cStats c}
 -- Returns statements unchanged.
 --
 -- If this returns a variable, then that variable is not bound.
-lookupVar :: Term Int -> UniM (Term Int)
-lookupVar (TVar v) = do
+lookupTerm :: Term Int -> UniM (Term Int)
+lookupTerm (TVar v) = do
   c <- get
   let lastV = follow (cVars c) v
   pure $ case cStats c Map.!? lastV of
     Nothing -> TVar lastV
     Just s  -> TStat s
-lookupVar t@(TStat _) = pure t
+lookupTerm t@(TStat _) = pure t
 
 -- | A simple state monad transformer over the list monad for easy backtracking.
 -- Needs to be changed when implementing cuts.
@@ -80,25 +80,25 @@ understand a = do
   vmap <- varMap a
   pure (fmap (vmap Map.!) a, vmap)
 
-satisfy :: Stat Int -> UniM ()
-satisfy s = do
+satisfyStat :: Stat Int -> UniM ()
+satisfyStat stat = do
   c <- get
   (Def dStat dStats, _) <- understand =<< lift (cDb c)
-  unifyStat s dStat
+  unifyStat stat dStat
   satisfyStats dStats
 
 satisfyStats :: [Stat Int] -> UniM ()
-satisfyStats = traverse_ satisfy
+satisfyStats = traverse_ satisfyStat
 
 unifyStat :: Stat Int -> Stat Int -> UniM ()
 unifyStat (Stat name1 args1) (Stat name2 args2) = do
   guard $ name1 == name2
   unifyTerms args1 args2
 
-unify :: Term Int -> Term Int -> UniM ()
-unify t1 t2 = do
-  t1' <- lookupVar t1
-  t2' <- lookupVar t2
+unifyTerm :: Term Int -> Term Int -> UniM ()
+unifyTerm t1 t2 = do
+  t1' <- lookupTerm t1
+  t2' <- lookupTerm t2
   case (t1', t2') of
     (TStat s1, TStat s2) -> unifyStat s1 s2
     (TVar v, TStat s)    -> bindStat v s
@@ -108,10 +108,12 @@ unify t1 t2 = do
 unifyTerms :: [Term Int] -> [Term Int] -> UniM ()
 unifyTerms t1 t2 = do
   guard $ length t1 == length t2
-  sequenceA_ $ zipWith unify t1 t2
+  sequenceA_ $ zipWith unifyTerm t1 t2
 
 -- Figuring out how to display the result of the unification
 
+-- | An infinite list of possible variable names: @A@, @B@, ..., @A1@, @B1@,
+-- ..., @A2@, ...
 varNames :: [T.Text]
 varNames = do
   num <- "" : map (T.pack . show) [(1::Integer)..]
@@ -120,6 +122,9 @@ varNames = do
   where
     alphabet = map T.singleton ['A'..'Z']
 
+-- | Find a naming (Map from integer to name) for all variables in a list of
+-- terms based on the original variable names and the variable mapping. Attempts
+-- to map variables to known variables instead of a common unknown variable.
 findVarNaming :: Map.Map T.Text Int -> Map.Map Int Int -> [Term Int] -> Map.Map Int T.Text
 findVarNaming known vars terms =
   let knownLookedUp = fmap (follow vars) known
@@ -132,9 +137,10 @@ findVarNaming known vars terms =
       unknownNaming = Map.fromList $ zip (sort $ Set.toList unknownVars) availVarNames
   in  knownNaming <> unknownNaming
 
+-- | Recursively set variables to their most resolved term.
 resolveVars :: Term Int -> UniM (Term Int)
 resolveVars t = do
-  t2 <- lookupVar t
+  t2 <- lookupTerm t
   case t2 of
     (TVar v) -> pure $ TVar v
     (TStat (Stat name args)) -> TStat . Stat name <$> traverse resolveVars args
