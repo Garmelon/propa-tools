@@ -110,6 +110,8 @@ unifyTerms t1 t2 = do
   lift $ guard $ length t1 == length t2
   sequenceA_ $ zipWith unify t1 t2
 
+-- Figuring out how to display the result of the unification
+
 varNames :: [T.Text]
 varNames = do
   num <- "" : map (T.pack . show) [(1::Integer)..]
@@ -139,6 +141,7 @@ resolveVars t = do
       args2 <- traverse resolveVars args
       pure $ Stat name args2
 
+-- | Helper type so I can resolve variables in multiple terms simultaneously.
 newtype Terms a = Terms { unTerms :: [Term a] }
 
 instance Functor Terms where
