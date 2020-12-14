@@ -29,6 +29,7 @@ displayName name
       ]
 
 displayStat :: Stat T.Text -> T.Text
+displayStat (Stat "[]" []) = "[]"
 displayStat (Stat "[|]" [a, b]) = "[" <> displayTerm a <> displayList b
 displayStat (Stat name []) = displayName name
 displayStat (Stat name args)
