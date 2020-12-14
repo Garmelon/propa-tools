@@ -93,11 +93,12 @@ unifyTerm t1 t2 = do
   t1' <- lookupTerm t1
   t2' <- lookupTerm t2
   case (t1', t2') of
-    (TStat s1, TStat s2) -> unifyStat s1 s2
-    (TInt i1, TInt i2)   -> guard $ i1 == i2
-    (TVar v, t)          -> bindTerm v t
-    (t, TVar v)          -> bindTerm v t
-    (_, _)               -> empty
+    (TStat s1, TStat s2)      -> unifyStat s1 s2
+    (TInt i1, TInt i2)        -> guard $ i1 == i2
+    (TVar v, TVar w) | v == w -> pure ()
+    (TVar v, t)               -> bindTerm v t
+    (t, TVar v)               -> bindTerm v t
+    (_, _)                    -> empty
 
 unifyTerms :: [Term Int] -> [Term Int] -> UniM ()
 unifyTerms t1 t2 = do
