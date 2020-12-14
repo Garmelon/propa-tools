@@ -11,13 +11,13 @@ import           Propa.Prolog.Display
 import           Propa.Prolog.Parse
 import           Propa.Prolog.Unify
 
-parseAndRun :: T.Text -> T.Text -> IO ()
-parseAndRun dbText statsText = T.putStrLn $ case results of
+parseAndRun :: String -> String -> IO ()
+parseAndRun dbStr statsStr = T.putStrLn $ case results of
   Left e   -> e
   Right [] -> "No."
   Right rs -> T.intercalate "\n" rs
   where
     results = do
-      db <- parseDb "<input>" dbText
-      stats <- parseStats "<input>" statsText
+      db <- parseDb "<db>" $ T.pack dbStr
+      stats <- parseStats "<query>" $ T.pack statsStr
       pure $ map displayResult $ run db stats
