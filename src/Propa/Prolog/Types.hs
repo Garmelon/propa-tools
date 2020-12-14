@@ -1,6 +1,7 @@
 module Propa.Prolog.Types
   ( Stat(..)
   , Term(..)
+  , tVar
   , Def(..)
   , Db
   ) where
@@ -21,20 +22,28 @@ instance Traversable Stat where
 
 data Term a
   = TVar a
+  | TInt Integer
   | TStat (Stat a)
   deriving (Show, Eq)
 
 instance Functor Term where
   fmap f (TVar a)  = TVar $ f a
+  fmap _ (TInt i)  = TInt i
   fmap f (TStat s) = TStat $ fmap f s
 
 instance Foldable Term where
   foldMap f (TVar a)  = f a
+  foldMap _ (TInt _)  = mempty
   foldMap f (TStat s) = foldMap f s
 
 instance Traversable Term where
   traverse f (TVar a)  = TVar <$> f a
+  traverse _ (TInt i)  = pure $ TInt i
   traverse f (TStat s) = TStat <$> traverse f s
+
+tVar :: Term a -> Maybe a
+tVar (TVar v) = Just v
+tVar _        = Nothing
 
 data Def a = Def (Stat a) [Stat a]
   deriving (Show)

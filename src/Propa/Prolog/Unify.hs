@@ -4,6 +4,7 @@ module Propa.Prolog.Unify
   ( run
   ) where
 
+import           Control.Applicative
 import           Control.Monad
 import           Data.Foldable
 import           Data.List
@@ -21,8 +22,8 @@ import           Propa.Prolog.Types
 
 -- | Start at a value and follow the map's entries until the end of the chain of
 -- references.
-follow :: (Ord a) => Map.Map a a -> a -> a
-follow m v = maybe v (follow m) $ m Map.!? v
+follow :: (Ord a) => (b -> Maybe a) -> Map.Map a b -> b -> b
+follow f m b = maybe b (follow f m) $ (m Map.!?) =<< f b
 
 -- | Deduplicates the elements of a finite list. Doesn't preserve the order of
 -- the elements. Doesn't work on infinite lists.
@@ -34,31 +35,23 @@ deduplicate = Set.toList . Set.fromList
 data Context = Context
   { cDb     :: Db T.Text
   , cVarIdx :: Int
-  , cVars   :: Map.Map Int Int
-  , cStats  :: Map.Map Int (Stat Int)
+  , cTerms  :: Map.Map Int (Term Int)
   } deriving (Show)
 
 newContext :: [Def T.Text] -> Context
-newContext db = Context db 0 Map.empty Map.empty
+newContext db = Context db 0 Map.empty
 
-bindVar :: Int -> Int -> UniM ()
-bindVar k v = modify $ \c -> c{cVars = Map.insert k v $ cVars c}
-
-bindStat :: Int -> Stat Int -> UniM ()
-bindStat k s = modify $ \c -> c{cStats = Map.insert k s $ cStats c}
+bindTerm :: Int -> Term Int -> UniM ()
+bindTerm k v = modify $ \c -> c{cTerms = Map.insert k v $ cTerms c}
 
 -- | Look up a variable, first repeatedly in the var map and then the term map.
 -- Returns statements unchanged.
 --
 -- If this returns a variable, then that variable is not bound.
 lookupTerm :: Term Int -> UniM (Term Int)
-lookupTerm (TVar v) = do
+lookupTerm t = do
   c <- get
-  let lastV = follow (cVars c) v
-  pure $ case cStats c Map.!? lastV of
-    Nothing -> TVar lastV
-    Just s  -> TStat s
-lookupTerm t@(TStat _) = pure t
+  pure $ follow tVar (cTerms c) t
 
 -- | A simple state monad transformer over the list monad for easy backtracking.
 -- Needs to be changed when implementing cuts.
@@ -101,9 +94,10 @@ unifyTerm t1 t2 = do
   t2' <- lookupTerm t2
   case (t1', t2') of
     (TStat s1, TStat s2) -> unifyStat s1 s2
-    (TVar v, TStat s)    -> bindStat v s
-    (TStat s, TVar v)    -> bindStat v s
-    (TVar v1, TVar v2)   -> bindVar v1 v2 -- The order shouldn't really matter
+    (TInt i1, TInt i2)   -> guard $ i1 == i2
+    (TVar v, t)          -> bindTerm v t
+    (t, TVar v)          -> bindTerm v t
+    (_, _)               -> empty
 
 unifyTerms :: [Term Int] -> [Term Int] -> UniM ()
 unifyTerms t1 t2 = do
@@ -125,9 +119,10 @@ varNames = do
 -- | Find a naming (Map from integer to name) for all variables in a list of
 -- terms based on the original variable names and the variable mapping. Attempts
 -- to map variables to known variables instead of a common unknown variable.
-findVarNaming :: Map.Map T.Text Int -> Map.Map Int Int -> [Term Int] -> Map.Map Int T.Text
+findVarNaming :: Map.Map T.Text Int -> Map.Map Int (Term Int) -> [Term Int] -> Map.Map Int T.Text
 findVarNaming known vars terms =
-  let knownLookedUp = fmap (follow vars) known
+  let knownLookedUp :: Map.Map T.Text Int
+      knownLookedUp = Map.mapMaybe (tVar . follow tVar vars . TVar) known
       knownNaming = Map.fromList $ reverse $ map swap $ Map.toList knownLookedUp
       knownNames = Map.keysSet known
       knownVars = Map.keysSet knownNaming
@@ -142,7 +137,8 @@ resolveVars :: Term Int -> UniM (Term Int)
 resolveVars t = do
   t2 <- lookupTerm t
   case t2 of
-    (TVar v) -> pure $ TVar v
+    (TVar v)                 -> pure $ TVar v
+    (TInt i)                 -> pure $ TInt i
     (TStat (Stat name args)) -> TStat . Stat name <$> traverse resolveVars args
 
 -- | Helper type so I can resolve variables in multiple statements
@@ -163,5 +159,5 @@ run db stats = map fst $ runStateT helper $ newContext db
       satisfyStats $ unStats stats2
       tmap <- traverse (resolveVars . TVar) vmap
       c <- get
-      let naming = findVarNaming vmap (cVars c) $ Map.elems tmap
+      let naming = findVarNaming vmap (cTerms c) $ Map.elems tmap
       pure $ fmap (naming Map.!) <$> tmap

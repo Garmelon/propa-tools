@@ -45,6 +45,7 @@ displayList t                           = "|" <> displayTerm t <> "]"
 
 displayTerm :: Term T.Text -> T.Text
 displayTerm (TVar v)  = v
+displayTerm (TInt i)  = T.pack $ show i
 displayTerm (TStat s) = displayStat s
 
 displayTerms :: [Term T.Text] -> T.Text

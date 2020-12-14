@@ -54,7 +54,8 @@ pTermToStat :: Parser (Term T.Text) -> Parser (Stat T.Text)
 pTermToStat p = do
   term <- p
   case term of
-    (TVar _)  -> fail "expected term, not variable"
+    (TVar _)  -> fail "expected statement, not variable"
+    (TInt _)  -> fail "expected statement, not integer"
     (TStat s) -> pure s
 
 -- | Parse a statement of the form @name(args)@.
@@ -88,6 +89,7 @@ pList = do
 pPlainTerm :: Parser (Term T.Text)
 pPlainTerm
   =   (TVar <$> pVarName)
+  <|> (TInt <$> L.signed (pure ()) L.decimal)
   <|> (TStat <$> pPlainStat)
   <|> try pCons
   <|> pList
